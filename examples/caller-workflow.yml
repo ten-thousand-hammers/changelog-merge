@@ -25,13 +25,12 @@ jobs:
           fragments-dir: changelog
           output-file: CHANGES_COMBINED.md
 
+      - name: Install git-cliff (for the fallback)
+        if: steps.merge.outputs.has-fragments == 'false'
+        uses: ten-thousand-hammers/setup-git-cliff@v1
+
       - name: Fallback to git-cliff when there are no fragments
         if: steps.merge.outputs.has-fragments == 'false'
-        uses: orhun/git-cliff-action@v4.6.0
-        with:
-          config: cliff.toml
-          args: --unreleased
-        env:
-          OUTPUT: CHANGES_COMBINED.md
+        run: git-cliff --config cliff.toml --unreleased -o CHANGES_COMBINED.md
 
       # ... hand CHANGES_COMBINED.md to changelog-release ...
