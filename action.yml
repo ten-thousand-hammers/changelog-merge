@@ -1,0 +1,26 @@
+name: Merge Changelog Fragments
+description: Merges per-PR changelog fragments into a single combined changelog, grouping entries under matching category headers.
+
+inputs:
+  fragments-dir:
+    description: Directory containing changelog fragment files
+    default: changelog
+  output-file:
+    description: Path to write the combined changelog
+    default: CHANGES_COMBINED.md
+
+outputs:
+  has-fragments:
+    description: Whether any fragments were found
+    value: ${{ steps.merge.outputs.has-fragments }}
+
+runs:
+  using: composite
+  steps:
+    - name: Merge fragments
+      id: merge
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/merge.js"
+      env:
+        FRAGMENTS_DIR: ${{ inputs.fragments-dir }}
+        OUTPUT_FILE: ${{ inputs.output-file }}
