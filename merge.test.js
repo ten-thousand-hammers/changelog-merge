@@ -506,3 +506,74 @@ describe("findFragments", () => {
     assert.deepStrictEqual(findFragments("/nonexistent"), []);
   });
 });
+
+describe("formatOutput grouped by category", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "changelog-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  function fragment(pr, title, sections) {
+    const body = Object.entries(sections)
+      .map(([header, items]) => `### ${header}\n\n${items.map((i) => `- ${i}`).join("\n")}\n`)
+      .join("\n");
+    return writeTempFragment(
+      tmpDir,
+      `${pr}-CHANGES.md`,
+      `# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n## [Unreleased]\n<!-- title: ${title} -->\n\n${body}`
+    );
+  }
+
+  test("lists every PR's entries under shared categories, oldest PR first, without PR headings", () => {
+    const fragments = [
+      fragment(10, "feat: repeats", { Features: ["Tell the server when a meeting repeats"] }),
+      fragment(6, "fix: ad-hoc titles", { "Bug Fixes": ["Stop ad-hoc calls taking a nearby event's title"] }),
+      fragment(9, "feat: split calls", {
+        Features: ["Start a new recording when a call moves to another Meet"],
+        "Bug Fixes": ["Start recording the moment a call takes the microphone"],
+      }),
+    ];
+
+    assert.strictEqual(
+      formatOutput(fragments, "category"),
+      `# Changelog
+
+## [Unreleased]
+
+### Features
+- Start a new recording when a call moves to another Meet
+- Tell the server when a meeting repeats
+
+### Bug Fixes
+- Stop ad-hoc calls taking a nearby event's title
+- Start recording the moment a call takes the microphone
+
+`
+    );
+  });
+
+  test("drops an entry two fragments share", () => {
+    const fragments = [
+      fragment(8, "feat: split calls", { Features: ["Start a new recording when a call moves to another Meet"] }),
+      fragment(9, "feat: split calls", {
+        Features: ["Start a new recording when a call moves to another Meet"],
+        "Bug Fixes": ["Skip calendar blocks"],
+      }),
+    ];
+
+    const output = formatOutput(fragments, "category");
+    assert.strictEqual(output.match(/another Meet/g).length, 1);
+    assert.ok(output.includes("### Bug Fixes\n- Skip calendar blocks\n"));
+    assert.ok(!output.includes("####"));
+  });
+
+  test("a single fragment reads the same as with the default grouping", () => {
+    const fragments = [fragment(6, "fix: ad-hoc titles", { "Bug Fixes": ["Stop ad-hoc calls taking a nearby event's title"] })];
+    assert.strictEqual(formatOutput(fragments, "category"), formatOutput(fragments));
+  });
+});

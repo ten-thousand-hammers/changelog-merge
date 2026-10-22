@@ -25,6 +25,7 @@ Part of the changelog actions suite:
 | --- | --- | --- |
 | `fragments-dir` | `changelog` | Directory containing `*-CHANGES.md` fragment files. |
 | `output-file` | `CHANGES_COMBINED.md` | Path to write the combined changelog. |
+| `group-by` | `pr` | `pr` or `category`; see below. |
 
 ## Outputs
 
@@ -40,6 +41,10 @@ Part of the changelog actions suite:
   The PR title is read from a `<!-- title: ... -->` comment that
   [`changelog-generate`](https://github.com/ten-thousand-hammers/changelog-generate)
   injects into each fragment.
+- **`group-by: category`** → every fragment's entries are listed under shared
+  `### {category}` headers, oldest PR first, with no PR headings and duplicate
+  entries dropped. Suits release notes that users read, such as an app's update
+  window, where a PR title repeating its only entry reads as noise.
 
 ## Development
 

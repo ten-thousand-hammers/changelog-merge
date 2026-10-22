@@ -8,6 +8,12 @@ inputs:
   output-file:
     description: Path to write the combined changelog
     default: CHANGES_COMBINED.md
+  group-by:
+    description: >-
+      "pr" nests each PR's categories under its title when there are several
+      fragments. "category" lists every PR's entries under shared category
+      headers, without PR headings, and drops duplicate entries.
+    default: pr
 
 outputs:
   has-fragments:
@@ -24,3 +30,4 @@ runs:
       env:
         FRAGMENTS_DIR: ${{ inputs.fragments-dir }}
         OUTPUT_FILE: ${{ inputs.output-file }}
+        GROUP_BY: ${{ inputs.group-by }}

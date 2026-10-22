@@ -3,6 +3,7 @@ const path = require("path");
 
 const fragmentsDir = process.env.FRAGMENTS_DIR || "changelog";
 const outputFile = process.env.OUTPUT_FILE || "CHANGES_COMBINED.md";
+const groupBy = process.env.GROUP_BY || "pr";
 const githubOutput = process.env.GITHUB_OUTPUT;
 
 function findFragments(dir) {
@@ -63,10 +64,56 @@ function mergeFragments(fragments) {
   return merged;
 }
 
-function formatOutput(fragments) {
+// Oldest PR first, so "10-CHANGES.md" follows "9-CHANGES.md" rather than "1-CHANGES.md".
+function byPrNumber(a, b) {
+  return Number(prNumberFromPath(a)) - Number(prNumberFromPath(b));
+}
+
+// Category headers in the order the fragments list them. Each fragment keeps
+// git-cliff's group order (Features before Bug Fixes), so a header comes after
+// every header that precedes it in any fragment; otherwise first seen, first.
+function categoryOrder(fragments) {
+  const seen = [];
+  const before = new Map();
+  for (const filePath of fragments) {
+    const headers = [...parseFragment(filePath).sections.keys()];
+    headers.forEach((header, index) => {
+      if (!before.has(header)) {
+        before.set(header, new Set());
+        seen.push(header);
+      }
+      for (const earlier of headers.slice(0, index)) before.get(header).add(earlier);
+    });
+  }
+  const ordered = [];
+  const remaining = [...seen];
+  while (remaining.length > 0) {
+    // Fall back to the first remaining header if fragments disagree on order.
+    const index = Math.max(0, remaining.findIndex((h) => [...before.get(h)].every((e) => ordered.includes(e))));
+    ordered.push(...remaining.splice(index, 1));
+  }
+  return ordered;
+}
+
+function formatOutput(fragments, groupBy = "pr") {
   let output = "# Changelog\n\n## [Unreleased]\n\n";
 
-  if (fragments.length === 1) {
+  if (groupBy === "category") {
+    // One list per category across every PR, without PR headings. An entry
+    // that two fragments share (a commit that reached the base branch through
+    // two PRs) is listed once.
+    const sorted = [...fragments].sort(byPrNumber);
+    const merged = mergeFragments(sorted);
+    for (const header of categoryOrder(sorted)) {
+      const unique = [...new Set(merged.get(header))];
+      if (unique.length === 0) continue;
+      output += header + "\n";
+      for (const item of unique) {
+        output += item + "\n";
+      }
+      output += "\n";
+    }
+  } else if (fragments.length === 1) {
     const { sections } = parseFragment(fragments[0]);
     for (const [header, items] of sections) {
       if (items.length > 0) {
@@ -115,7 +162,10 @@ function main() {
   }
 
   console.log(`Found changelog fragments: ${fragments.join(", ")}`);
-  const output = formatOutput(fragments);
+  if (groupBy !== "pr" && groupBy !== "category") {
+    throw new Error(`group-by must be "pr" or "category", not "${groupBy}"`);
+  }
+  const output = formatOutput(fragments, groupBy);
   fs.writeFileSync(outputFile, output);
   console.log(`Written combined changelog to ${outputFile}`);
 
